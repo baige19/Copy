@@ -8,46 +8,103 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static System.Windows.Forms.LinkLabel;
 
 namespace Copy
 {
     public partial class Form1 : Form
     {
+        string verName = "HMI_ver";//版本号的名字
+        string verPath = @"src\pages\0_Module\dataTbl\version.js";//版本号所在文件路径
+        string verStr;//版本号
+        string MD5FilePath = @"dist\output\original\MD5_Check.txt";//MD5文件所在位置
+        string appFilePath = @"dist\output\original\app.prc";//程序所在位置
+        string logoFilePath = @"logo";//logo目录所在位置
+        string audioFilePath = @"audio";//audio目录所在位置
+        string chipPath = @"..\01CHIP\";//最终文件路径
+
         public Form1()
         {
             InitializeComponent();
+            CopyMain();
+            Environment.Exit(0);
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        /// <summary>
+        /// 主函数
+        /// </summary>
+        private void CopyMain()
         {
-
-            string target = "HMI_ver";
-            string lines;
-
-            //foreach (string line in File.ReadLines(@"src\pages\0_Module\dataTbl\version.js"))
-                foreach (string line in File.ReadLines(@"version.js"))
+            if (GetVer())
+            {
+                //创建app.prc的MD5文件
+                if (File.Exists(appFilePath))
                 {
-                    // 逐行处理，内存效率更高
-                    lines = Regex.Replace(line, @"\s+", "");
+                    File.WriteAllText(MD5FilePath, GetFileMD5(appFilePath));
+                }
+                else
+                {
+                    MessageBox.Show("找不到该路径文件：" + appFilePath);
+                    return;
+                }
 
-                    if (lines.Contains(target) && lines.Substring(0, 2) != "//")
+                //复制logo目录到指定路径
+                if (Directory.Exists(logoFilePath))
+                {
+                    CopyDirectory(logoFilePath, chipPath + verStr + @"\" + logoFilePath);
+                }
+                //复制audio目录下的文件到指定路径
+                if (Directory.Exists(audioFilePath))
+                {
+                    CopyFilesOnly(audioFilePath, chipPath + verStr);
+                }
+
+                //复制程序和其MD5值到01chip
+                File.Copy(appFilePath, Path.Combine(chipPath + verStr, Path.GetFileName(appFilePath)), true);
+                File.Copy(MD5FilePath, Path.Combine(chipPath + verStr, Path.GetFileName(MD5FilePath)), true);
+
+                //删除多余文件
+                DeletePath(@"dist");
+                DeletePath(@"tools\sdroot\gui");
+                DeletePath(@"tools\xfel\sdroot.bin");
+
+                MessageBox.Show("成功复制程序到01chip");
+            }
+            else
+            {
+                MessageBox.Show("获取不到版本号，请检查工程是否正确");
+            }
+        }
+
+        /// <summary>
+        /// 获取微码版本号
+        /// </summary>
+        private bool GetVer()
+        {
+            if (!File.Exists(verPath))
+            {
+                MessageBox.Show("找不到下列路径：" + verPath);
+                return false;
+            }
+            foreach (string line in File.ReadLines(verPath))
+            {
+                verStr = Regex.Replace(line, @"\s+", "");//清除该行文本的空白符号
+                //获取版本号变量名所在行，并且该行未被注释
+                if (verStr.Contains(verName) && verStr.Substring(0, 2) != "//")
+                {
+                    //获取双引号里面的字符串
+                    string[] parts = verStr.Split('"');
+                    if (parts.Length >= 3)
                     {
-                        string[] parts = lines.Split('"');
-                        if(parts.Length >= 3)
-                        {
-                            //richTextBox1.AppendText(parts[1]);
-                        }
+                        verStr = parts[1];
+                        return true;
                     }
                 }
-       
-            File.WriteAllText(@"MD5_Check.txt", GetFileMD5(@"app.prc"));
-
-            CopyAndDelete(@"MD5_Check.txt", @"../01chip/MD5_Check.txt");
-
-            DeletePath(@"tools\sdroot\gui");
-            DeletePath(@"tools\xfel\sdroot.bin");
+            }
+            return false;
         }
 
         /// <summary>
@@ -64,51 +121,6 @@ namespace Copy
         }
 
         /// <summary>
-        /// 复制文件到新位置后删除原文件
-        /// </summary>
-        public static bool CopyAndDelete(string sourcePath, string destinationPath)
-        {
-            try
-            {
-                // 参数验证
-                if (string.IsNullOrEmpty(sourcePath) || string.IsNullOrEmpty(destinationPath))
-                    return false;
-
-                if (!File.Exists(sourcePath))
-                    throw new FileNotFoundException($"源文件不存在: {sourcePath}");
-
-                // 确保目标目录存在
-                string destinationDir = Path.GetDirectoryName(destinationPath);
-                if (!Directory.Exists(destinationDir))
-                    Directory.CreateDirectory(destinationDir);
-
-                // 复制文件
-                File.Copy(sourcePath, destinationPath, true);
-                Console.WriteLine($"文件复制成功: {destinationPath}");
-
-                // 验证目标文件
-                if (File.Exists(destinationPath))
-                {
-                    // 删除原文件
-                    File.Delete(sourcePath);
-                    Console.WriteLine($"原文件删除成功: {sourcePath}");
-
-                    return true;
-                }
-                else
-                {
-                    Console.WriteLine("错误：复制后目标文件不存在");
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"复制删除操作失败: {ex.Message}");
-                return false;
-            }
-        }
-
-        /// <summary>
         /// 复制整个目录及其所有内容到目标目录
         /// </summary>
         /// <param name="sourcePath">源目录路径</param>
@@ -117,45 +129,64 @@ namespace Copy
         {
             try
             {
-                // 检查目标目录是否以目录分隔符结束，如果不是则添加:ml-citation{ref="1" data="citationList"}
+                // 检查目标目录是否以目录分隔符结束，如果不是则添加
                 if (!targetPath.EndsWith(Path.DirectorySeparatorChar.ToString()))
                 {
                     targetPath += Path.DirectorySeparatorChar;
                 }
 
-                // 判断目标目录是否存在，如果不存在则新建:ml-citation{ref="1,3" data="citationList"}
+                // 判断目标目录是否存在，如果不存在则新建
                 if (!Directory.Exists(targetPath))
                 {
                     Directory.CreateDirectory(targetPath);
                 }
 
-                // 获取源目录中的所有文件和子目录:ml-citation{ref="1,5" data="citationList"}
+                // 获取源目录中的所有文件和子目录
                 string[] fileSystemEntries = Directory.GetFileSystemEntries(sourcePath);
 
                 // 遍历所有的文件和目录
                 foreach (string entry in fileSystemEntries)
                 {
-                    // 如果是目录，则递归复制该目录:ml-citation{ref="1,4" data="citationList"}
+                    // 如果是目录，则递归复制该目录
                     if (Directory.Exists(entry))
                     {
                         string dirName = Path.GetFileName(entry);
                         CopyDirectory(entry, targetPath + dirName);
                     }
-                    // 如果是文件，则直接复制:ml-citation{ref="1,3" data="citationList"}
+                    // 如果是文件，则直接复制
                     else
                     {
                         string fileName = Path.GetFileName(entry);
                         string destFile = Path.Combine(targetPath, fileName);
-                        File.Copy(entry, destFile, true); // true表示覆盖已存在的文件:ml-citation{ref="3,6" data="citationList"}
+                        File.Copy(entry, destFile, true); // true表示覆盖已存在的文件
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"复制目录时出错: {ex.Message}");
+                MessageBox.Show($"复制目录时出错: {ex.Message}");
                 throw;
             }
         }
+
+        /// <summary>
+        /// 复制指定目录下的文件到到目标目录
+        /// </summary>
+        public static void CopyFilesOnly(string sourceDir, string destDir)
+        {
+            if (!Directory.Exists(destDir))
+            {
+                Directory.CreateDirectory(destDir);
+            }
+
+            string[] fileList = Directory.GetFiles(sourceDir);
+            foreach (string file in fileList)
+            {
+                string fileName = Path.GetFileName(file);
+                File.Copy(file, Path.Combine(destDir, fileName), true);
+            }
+        }
+
 
         /// <summary>
         /// 删除指定目录或文件
@@ -181,49 +212,3 @@ namespace Copy
 
     }
 }
-
-
-
-/*
- * @echo off
-
-set filepath1=..\01CHIP\X7.GD028A.F51.002-1.V100AXX
-set filepath2=..\01CHIP\X7.GD028A.F51.022-1.V100AXX
-
-echo 1:%filepath1:~10,19%
-echo 2:%filepath2:~10,19%
-set /p sel=选择微码号：
-if %sel% == 1 (
-	set filepath=%filepath1%
-) else (
-	set filepath=%filepath2%
-)
-
-echo 正在打包的是：%filepath%
-
-CALL MD5.bat
-
-if not exist %filepath%\logo (
-    MD %filepath%\logo
-)
-
-xcopy logo %filepath%\logo /e /y
-xcopy audio\* %filepath%\ /y
-
-if not exist dist\output\original\app.prc (
-    echo dist\output\original\app.prc不存在
-    goto :exit
-)
-copy dist\output\original\app.prc %filepath%
-copy dist\output\original\MD5_Check.txt %filepath%
-
-:exit
-if not "%1"=="-b" (
-rd dist /s /q
-rd tools\sdroot\gui /s /q
-del /f tools\xfel\sdroot.bin
-)
-
-ping 127.0.0.1 -n 3 >nul
-echo.
-*/
