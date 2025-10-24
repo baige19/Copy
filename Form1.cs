@@ -74,7 +74,7 @@ namespace Copy
                 DeletePath(@"tools\sdroot\gui");
                 DeletePath(@"tools\xfel\sdroot.bin");
 
-                MessageBox.Show("复制成功!请烧录微码到显示屏上\n确认版本号为： "+ verStr);
+                MessageBox.Show("复制成功！请烧录微码到显示屏上确认\n版本号为： " + verStr);
             }
         }
 
