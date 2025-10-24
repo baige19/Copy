@@ -64,18 +64,17 @@ namespace Copy
 
                 //复制程序和其MD5值到01chip
                 File.Copy(appFilePath, Path.Combine(chipPath + verStr, Path.GetFileName(appFilePath)), true);
-                File.Copy(MD5FilePath, Path.Combine(chipPath + verStr, Path.GetFileName(MD5FilePath)), true);
+                if (File.Exists(MD5FilePath))
+                {
+                    File.Copy(MD5FilePath, Path.Combine(chipPath + verStr, Path.GetFileName(MD5FilePath)), true);
+                }
 
                 //删除多余文件
                 DeletePath(@"dist");
                 DeletePath(@"tools\sdroot\gui");
                 DeletePath(@"tools\xfel\sdroot.bin");
 
-                MessageBox.Show("成功复制程序到01chip");
-            }
-            else
-            {
-                MessageBox.Show("获取不到版本号，请检查工程是否正确");
+                MessageBox.Show("复制成功!请烧录微码到显示屏上\n确认版本号为： "+ verStr);
             }
         }
 
@@ -104,6 +103,7 @@ namespace Copy
                     }
                 }
             }
+            MessageBox.Show("找不到版本号变量名：" + verName);
             return false;
         }
 
