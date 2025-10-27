@@ -17,14 +17,16 @@ namespace Copy
 {
     public partial class Form1 : Form
     {
+        string softVer = "版本号：1.0";
         string verName = "HMI_ver";//版本号的名字
-        string verPath = @"src\pages\0_Module\dataTbl\version.js";//版本号所在文件路径
+        string[] verPath = { @"src\pages\0_Module\dataTbl\version.js", @"src\pages\0_Module\emq\EmqCom.js", @"src\EmqCom.js" };//版本号所在文件路径
         string verStr;//版本号
         string MD5FilePath = @"dist\output\original\MD5_Check.txt";//MD5文件所在位置
         string appFilePath = @"dist\output\original\app.prc";//程序所在位置
         string logoFilePath = @"logo";//logo目录所在位置
         string audioFilePath = @"audio";//audio目录所在位置
         string chipPath = @"..\01CHIP\";//最终文件路径
+        
 
         public Form1()
         {
@@ -47,7 +49,7 @@ namespace Copy
                 }
                 else
                 {
-                    MessageBox.Show("找不到该路径文件：" + appFilePath);
+                    MessageBox.Show("找不到该路径文件：" + appFilePath, softVer);
                     return;
                 }
 
@@ -74,7 +76,7 @@ namespace Copy
                 DeletePath(@"tools\sdroot\gui");
                 DeletePath(@"tools\xfel\sdroot.bin");
 
-                MessageBox.Show("复制成功！请烧录微码到显示屏上确认\n版本号为： " + verStr);
+                MessageBox.Show("复制成功！请烧录微码到显示屏上确认\n版本号为： " + verStr, softVer);
             }
         }
 
@@ -83,27 +85,37 @@ namespace Copy
         /// </summary>
         private bool GetVer()
         {
-            if (!File.Exists(verPath))
+            string str = "找不到下列路径：\n";
+            foreach (string ver in verPath) 
             {
-                MessageBox.Show("找不到下列路径：" + verPath);
-                return false;
-            }
-            foreach (string line in File.ReadLines(verPath))
-            {
-                verStr = Regex.Replace(line, @"\s+", "");//清除该行文本的空白符号
-                //获取版本号变量名所在行，并且该行未被注释
-                if (verStr.Contains(verName) && verStr.Substring(0, 2) != "//")
+                if (!File.Exists(ver))
                 {
-                    //获取双引号里面的字符串
-                    string[] parts = verStr.Split('"');
-                    if (parts.Length >= 3)
+                    continue;
+                }
+                foreach (string line in File.ReadLines(ver))
+                {
+                    verStr = Regex.Replace(line, @"\s+", "");//清除该行文本的空白符号
+                                                             //获取版本号变量名所在行，并且该行未被注释
+                    if (verStr.Contains(verName) && verStr.Substring(0, 2) != "//")
                     {
-                        verStr = parts[1];
-                        return true;
+                        //获取双引号里面的字符串
+                        string[] parts = verStr.Split('"');
+                        if (parts.Length >= 3)
+                        {
+                            verStr = parts[1];
+                            return true;
+                        }
                     }
                 }
+                MessageBox.Show("找不到版本号变量名：" + verName, softVer);
+                return false;
             }
-            MessageBox.Show("找不到版本号变量名：" + verName);
+
+            foreach (string ver in verPath)
+            {
+                str = str + ver + "\n";
+            }
+            MessageBox.Show(str, softVer);
             return false;
         }
 
